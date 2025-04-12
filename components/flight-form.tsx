@@ -170,38 +170,40 @@ export function FlightForm() {
 
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn("w-full justify-start text-left font-normal", !flight.date && "text-gray-400")}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {flight.date ? format(flight.date, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={flight.date}
-                      onSelect={(date) => updateFlight(flight.id, "date", date)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="flex items-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeFlight(flight.id)}
-                  disabled={flights.length === 1}
-                  className="text-gray-400 hover:text-red-500"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  <div className="flex-1">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn("w-full justify-start text-left font-normal", !flight.date && "text-gray-400")}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {flight.date ? format(flight.date, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={flight.date}
+                          onSelect={(date) => updateFlight(flight.id, "date", date)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeFlight(flight.id)}
+                    disabled={flights.length === 1}
+                    className="text-gray-400 hover:text-red-500 h-10 w-10 flex-shrink-0"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
