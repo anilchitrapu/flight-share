@@ -13,7 +13,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 203 80% 40%;
+    --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -30,7 +30,7 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 203 80% 40%;
+    --ring: 222.2 84% 4.9%;
 
     --radius: 0.5rem;
   }
@@ -45,7 +45,7 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 203 80% 40%;
+    --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -62,7 +62,7 @@
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 203 80% 40%;
+    --ring: 212.7 26.8% 83.9%;
   }
 }
 
@@ -72,5 +72,191 @@
   }
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
   }
+  
+  /* !important override to fix background issue */
+  main#main-container {
+    background: linear-gradient(to bottom, #374151, #4B5563, #9CA3AF) !important;
+    background-size: 400% 400% !important;
+    animation: gradientShift 15s ease infinite !important;
+    position: relative !important;
+    z-index: 0 !important;
+  }
+  
+  main#main-container::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1IiBoZWlnaHQ9IjUiPgo8cmVjdCB3aWR0aD0iNSIgaGVpZ2h0PSI1IiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDIpIj48L3JlY3Q+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiPjwvcmVjdD4KPC9zdmc+');
+    pointer-events: none;
+    z-index: -1 !important;
+  }
+}
+
+/* Background Gradient Enhancement */
+.bg-gradient-enhanced {
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+  position: relative;
+  z-index: 0;
+}
+
+.bg-gradient-enhanced::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1IiBoZWlnaHQ9IjUiPgo8cmVjdCB3aWR0aD0iNSIgaGVpZ2h0PSI1IiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDIpIj48L3JlY3Q+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiPjwvcmVjdD4KPC9zdmc+');
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 0%; }
+  25% { background-position: 50% 100%; }
+  50% { background-position: 100% 0%; }
+  75% { background-position: 50% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+/* Flip Text Animation for Departure Board */
+.flip-char {
+  display: inline-block;
+  transform-style: preserve-3d;
+  transition: transform 0.2s ease-out;
+  backface-visibility: hidden;
+}
+
+.flip-char.flipping {
+  transform: rotateX(90deg);
+}
+
+.departure-board-container {
+  background-color: #111;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.departure-board-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(#ffffff10 1px, transparent 1px),
+    linear-gradient(rgba(0, 0, 0, 0.3) 1px, transparent 1px);
+  background-size: 10px 10px, 100% 32px;
+  background-position: 0 0, 0 0;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.departure-board-title {
+  position: relative;
+  background-color: #111;
+  padding: 0.5rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+}
+
+.departure-board-title::before {
+  content: "";
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  background-color: #FACC15;
+  position: relative;
+  margin-right: 0.5rem;
+  clip-path: polygon(0% 0%, 100% 0%, 100% 50%, 75% 100%, 0% 100%);
+}
+
+/* Flight Board Calendar Styles */
+.flight-board-calendar {
+  font-family: 'Courier New', monospace !important;
+}
+
+.flight-board-calendar button {
+  color: #facc15 !important;
+}
+
+.flight-board-calendar button:hover:not([disabled]) {
+  background-color: #facc15 !important;
+  color: black !important;
+}
+
+.flight-board-calendar button[data-selected] {
+  background-color: #facc15 !important;
+  color: black !important;
+}
+
+.flight-board-calendar div.rdp-caption {
+  color: #facc15 !important;
+}
+
+/* Boarding Pass Styles */
+.boarding-pass {
+  position: relative;
+  overflow: hidden;
+  break-inside: avoid;
+}
+
+.boarding-pass .perforation {
+  position: relative;
+  border-top: 2px dashed #e5e7eb;
+  margin: 0.5rem 0;
+}
+
+.boarding-pass .perforation::before,
+.boarding-pass .perforation::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background-color: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 50%;
+  top: -10px;
+}
+
+.boarding-pass .perforation::before {
+  left: -8px;
+}
+
+.boarding-pass .perforation::after {
+  right: -8px;
+}
+
+/* Apply montserrat font for a more modern feel */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+
+.boarding-pass {
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Flight Departure Board Custom Styling */
+.departure-board {
+  background-color: black;
+  font-family: 'Arial Narrow', 'Arial', sans-serif;
+  letter-spacing: 0.05em;
+  color: #facc15;
+}
+
+.departure-board input,
+.departure-board button {
+  font-family: 'Arial Narrow', 'Arial', sans-serif;
+  letter-spacing: 0.05em;
 }

@@ -110,12 +110,55 @@ export function FlightForm() {
     setIsGeneratingScreenshot(true);
 
     try {
+      // Add a temporary class to ensure all content is visible during screenshot
+      itineraryRef.current.classList.add('screenshot-mode');
+      
+      // Enhanced html2canvas options
       const canvas = await html2canvas(itineraryRef.current, {
-        scale: 2,
+        scale: 3, // Higher scale for better resolution
         backgroundColor: "#ffffff",
+        allowTaint: true, // Allow cross-origin images
+        useCORS: true, // Use CORS for external resources
+        logging: false,
+        foreignObjectRendering: false, // More reliable rendering in some browsers
+        ignoreElements: (element) => {
+          // Ignore any elements that might interfere with capture
+          return element.classList?.contains('ignore-screenshot') || false;
+        },
+        onclone: (documentClone) => {
+          // Fix for SVG and airplane icon rendering issues
+          const clonedDiv = documentClone.querySelector('[data-ref="itinerary-ref"]');
+          if (clonedDiv) {
+            // Find all plane icons and ensure they're properly rendered
+            const planeIcons = clonedDiv.querySelectorAll('.lucide-plane');
+            planeIcons.forEach(icon => {
+              // Ensure the plane icon has sufficient padding
+              const iconContainer = icon.closest('div');
+              if (iconContainer) {
+                (iconContainer as HTMLElement).style.padding = '4px';
+              }
+            });
+            
+            // Ensure all airport descriptions are visible
+            const airportDescs = clonedDiv.querySelectorAll('.text-\\[10px\\]');
+            airportDescs.forEach(desc => {
+              // Force all airport names to be visible
+              const descElement = desc as HTMLElement;
+              descElement.style.maxHeight = 'none';
+              descElement.style.overflow = 'visible';
+              descElement.style.display = 'block';
+              // Use any type for non-standard CSS properties
+              (descElement.style as any).lineClamp = 'none';
+              (descElement.style as any).webkitLineClamp = 'none';
+            });
+          }
+        }
       });
 
-      const image = canvas.toDataURL("image/png");
+      // Remove temporary class
+      itineraryRef.current.classList.remove('screenshot-mode');
+
+      const image = canvas.toDataURL("image/png", 1.0); // Higher quality PNG
       const link = document.createElement("a");
       link.href = image;
       link.download = `${itineraryName.replace(/[^a-zA-Z0-9]/g, '_') || 'flight'}_itinerary.png`;
@@ -123,6 +166,10 @@ export function FlightForm() {
     } catch (error) {
       console.error("Error generating screenshot:", error);
       toast.error("Failed to generate screenshot");
+      // Remove temporary class in case of error
+      if (itineraryRef.current) {
+        itineraryRef.current.classList.remove('screenshot-mode');
+      }
     } finally {
       setIsGeneratingScreenshot(false);
     }
@@ -132,62 +179,73 @@ export function FlightForm() {
 
   return (
     <div>
-      <form onSubmit={handleSubmit} className="p-6">
+      <form onSubmit={handleSubmit} className="p-6 bg-black text-yellow-300 font-mono rounded-lg">
         <div className="space-y-4">
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Itinerary Name</label>
+            <label className="block text-sm font-medium text-yellow-300 mb-1 uppercase tracking-wider">Itinerary Name</label>
             <Input
               type="text"
               placeholder="e.g. Summer Vacation 2025"
               value={itineraryName}
               onChange={(e) => setItineraryName(e.target.value)}
+              className="bg-black border-yellow-500 text-yellow-300 placeholder-yellow-700 font-mono uppercase"
             />
           </div>
+          
+          {/* Flight board header */}
+          <div className="grid grid-cols-3 gap-2 mb-2 text-xs uppercase tracking-widest text-center border-b border-yellow-500 pb-2">
+            <div>Airline</div>
+            <div>Flight</div>
+            <div>Date</div>
+          </div>
+          
           {flights.map((flight, index) => (
-            <div key={flight.id} className="flex flex-col md:flex-row gap-3 pb-4 border-b border-gray-100">
+            <div key={flight.id} className="flex flex-col md:flex-row gap-3 pb-4 border-b border-yellow-500/30">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Airline Code</label>
                 <Input
                   type="text"
-                  placeholder="e.g. DL"
+                  placeholder="DL"
                   value={flight.airline}
                   onChange={(e) => updateFlight(flight.id, "airline", e.target.value.toUpperCase())}
                   maxLength={3}
-                  className="uppercase"
+                  className="bg-black border-yellow-500 text-yellow-300 font-mono font-bold uppercase tracking-widest h-12"
                 />
               </div>
 
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Flight Number</label>
                 <Input
                   type="text"
-                  placeholder="e.g. 123"
+                  placeholder="123"
                   value={flight.flightNumber}
                   onChange={(e) => updateFlight(flight.id, "flightNumber", e.target.value.replace(/[^0-9]/g, ""))}
                   maxLength={4}
+                  className="bg-black border-yellow-500 text-yellow-300 font-mono font-bold tracking-widest h-12"
                 />
               </div>
 
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                 <div className="flex items-center gap-1.5">
                   <div className="flex-1">
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className={cn("w-full justify-start text-left font-normal", !flight.date && "text-gray-400")}
+                          className={cn(
+                            "w-full justify-start text-left font-mono bg-black border-yellow-500 text-yellow-300 h-12 uppercase tracking-widest",
+                            !flight.date && "text-yellow-700"
+                          )}
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {flight.date ? format(flight.date, "PPP") : <span>Pick a date</span>}
+                          <CalendarIcon className="mr-2 h-4 w-4 text-yellow-300" />
+                          {flight.date ? format(flight.date, "dd MMM yyyy").toUpperCase() : <span>SELECT DATE</span>}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
+                      <PopoverContent className="w-auto p-0 bg-black border-yellow-500">
                         <Calendar
                           mode="single"
                           selected={flight.date}
                           onSelect={(date) => updateFlight(flight.id, "date", date)}
                           initialFocus
+                          className="flight-board-calendar"
                         />
                       </PopoverContent>
                     </Popover>
@@ -199,7 +257,7 @@ export function FlightForm() {
                     size="icon"
                     onClick={() => removeFlight(flight.id)}
                     disabled={flights.length === 1}
-                    className="text-gray-400 hover:text-red-500 h-10 w-10 flex-shrink-0"
+                    className="text-yellow-300 hover:text-red-500 h-12 w-12 flex-shrink-0 bg-black border border-yellow-500"
                   >
                     <X className="h-5 w-5" />
                   </Button>
@@ -208,32 +266,33 @@ export function FlightForm() {
             </div>
           ))}
 
-          <Button type="button" variant="outline" onClick={addFlight} className="w-full mt-2">
-            <Plus className="mr-2 h-4 w-4" /> Add Another Flight
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={addFlight} 
+            className="w-full mt-4 font-mono text-black bg-yellow-300 hover:bg-yellow-400 border-yellow-500"
+          >
+            <Plus className="mr-2 h-4 w-4" /> ADD FLIGHT
           </Button>
         </div>
 
         <div className="mt-6">
           <Button 
             type="submit" 
-            className="w-full bg-sky-600 hover:bg-sky-700" 
+            className="w-full font-mono text-black bg-yellow-300 hover:bg-yellow-400 border-yellow-500 uppercase tracking-wider h-12"
             disabled={!isFormValid || flights.some(f => f.isLoading)}
           >
-            {flights.some(f => f.isLoading) ? "Loading..." : "Generate Itinerary"}
+            {flights.some(f => f.isLoading) ? "LOADING..." : "GENERATE BOARDING PASS"}
           </Button>
         </div>
       </form>
 
       {showItinerary && (
         <div className="p-6 border-t border-gray-100">
-          <div className="mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Your Itinerary</h2>
-            <p className="text-sm text-gray-500">Share this with your friends and family</p>
-          </div>
-
           <div 
             ref={itineraryRef} 
-            className="bg-white p-6 rounded-lg border border-gray-200 w-full max-w-[800px] mx-auto"
+            data-ref="itinerary-ref"
+            className="bg-white rounded-lg w-full mx-auto"
             style={{ height: 'auto', overflow: 'visible' }}
           >
             <FlightItinerary flights={flights} itineraryName={itineraryName} />
@@ -242,15 +301,32 @@ export function FlightForm() {
           <div className="mt-6">
             <Button
               onClick={generateScreenshot}
-              className="w-full bg-sky-600 hover:bg-sky-700"
+              className="w-full text-black bg-yellow-400 hover:bg-yellow-500 border-yellow-600"
               disabled={isGeneratingScreenshot}
             >
               <Download className="mr-2 h-4 w-4" />
-              {isGeneratingScreenshot ? "Generating..." : "Download Screenshot"}
+              {isGeneratingScreenshot ? "GENERATING..." : "DOWNLOAD BOARDING PASSES"}
             </Button>
           </div>
         </div>
       )}
+      
+      {/* Add global styles for flight board inspired components */}
+      <style jsx global>{`
+        .flight-board-calendar {
+          background-color: black;
+          color: #fde047;
+          font-family: 'Courier New', monospace;
+        }
+        .flight-board-calendar .rdp-button:hover:not([disabled]) {
+          background-color: #fde047;
+          color: black;
+        }
+        .flight-board-calendar .rdp-day_selected {
+          background-color: #fde047;
+          color: black;
+        }
+      `}</style>
     </div>
   )
 }

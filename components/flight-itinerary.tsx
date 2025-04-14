@@ -1,7 +1,7 @@
 "use client"
 
 import { format, isSameDay } from "date-fns"
-import { Plane } from "lucide-react"
+import { Plane, ArrowRight, QrCode } from "lucide-react"
 import type { Flight } from "@/lib/types"
 import { getAirportName } from "@/lib/utils"
 
@@ -10,25 +10,38 @@ interface FlightItineraryProps {
   itineraryName?: string
 }
 
-interface FlightGroup {
-  date: Date
-  flights: (Flight & { departureDate: Date; arrivalDate: Date })[]
-}
-
 // Function to truncate airport names to fit in two lines
 const truncateAirportName = (name: string, maxLength = 30): string => {
   if (!name) return '';
   
-  // First try to find a natural break point (like "International" or "Airport")
-  const parts = name.split(' ');
-  if (parts.length > 3) {
-    // Try to make a sensible two-line name
-    const firstLine = parts.slice(0, Math.ceil(parts.length/2)).join(' ');
-    return firstLine;
+  // Smart truncation that preserves the beginning and important parts
+  if (name.length <= maxLength) return name;
+  
+  // Try to find natural break points like spaces
+  const words = name.split(' ');
+  
+  // If we have multiple words, try to keep the most important ones
+  if (words.length > 1) {
+    // Keep first word and as many as will fit within maxLength
+    let result = words[0];
+    let currentLength = result.length;
+    
+    for (let i = 1; i < words.length; i++) {
+      if (currentLength + words[i].length + 1 <= maxLength - 3) {
+        result += ' ' + words[i];
+        currentLength += words[i].length + 1;
+      } else {
+        // We can't fit more words, so add ellipsis and break
+        result += '...';
+        break;
+      }
+    }
+    
+    return result;
   }
   
-  // If the name is too long, truncate it
-  return name.length > maxLength ? name.substring(0, maxLength) + '...' : name;
+  // If it's just one long word or we couldn't fit multiple words
+  return name.substring(0, maxLength - 3) + '...';
 };
 
 export function FlightItinerary({ flights, itineraryName }: FlightItineraryProps) {
@@ -41,18 +54,6 @@ export function FlightItinerary({ flights, itineraryName }: FlightItineraryProps
       return "N/A"
     }
   }
-
-  // Helper function to get airline name from code
-  const getAirlineName = (code: string) => {
-    const airlines: Record<string, string> = {
-      DL: "Delta Air Lines", AA: "American Airlines", UA: "United Airlines",
-      WN: "Southwest Airlines", B6: "JetBlue Airways", AS: "Alaska Airlines",
-      LH: "Lufthansa", BA: "British Airways", AF: "Air France", KL: "KLM Royal Dutch Airlines",
-      // Add more as needed
-    }
-    return airlines[code] || code
-  }
-
   // Helper function to format ISO 8601 duration to human-readable
   const formatDuration = (isoDuration: string) => {
     if (!isoDuration) return "N/A";
@@ -65,135 +66,204 @@ export function FlightItinerary({ flights, itineraryName }: FlightItineraryProps
     return `${hours}h ${minutes}m`;
   }
 
-  // Group flights by departure date
-  const flightGroups: FlightGroup[] = [];
-  flights.forEach(flight => {
-    if (!flight.date || !flight.status) return;
-    const departureDate = new Date(flight.status.departure);
-    const arrivalDate = new Date(flight.status.arrival);
-    // Only group if departure and arrival are on the same day, or if it's the only flight for that departure day
-    const isOvernight = !isSameDay(departureDate, arrivalDate);
-    const enrichedFlight = { ...flight, departureDate, arrivalDate, isOvernight };
+  // Helper function to extract proper airport codes from flight status response
+  const getFlightEndpoints = (flight: Flight) => {
+    if (!flight.status) return { departureAirport: 'N/A', arrivalAirport: 'N/A' };
 
-    const existingGroup = flightGroups.find(group => isSameDay(group.date, departureDate));
-    if (existingGroup) {
-        // Add to existing group, maintaining order
-        existingGroup.flights.push(enrichedFlight);
-    } else {
-        flightGroups.push({ date: departureDate, flights: [enrichedFlight] });
+    let departureAirport = 'N/A';
+    let arrivalAirport = 'N/A';
+
+    // Prioritize 'legs' data if available
+    if (flight.status.legs && Array.isArray(flight.status.legs) && flight.status.legs.length > 0) {
+      departureAirport = flight.status.legs[0].boardPointIataCode || 'N/A';
+      arrivalAirport = flight.status.legs[0].offPointIataCode || 'N/A';
+    } 
+    // Fallback to 'segments' data if available
+    else if (flight.status.segments && Array.isArray(flight.status.segments) && flight.status.segments.length > 0) {
+      departureAirport = flight.status.segments[0].boardPointIataCode || 'N/A';
+      arrivalAirport = flight.status.segments[0].offPointIataCode || 'N/A';
+    } 
+    // Final fallback to 'flightPoints' if available
+    else if (flight.status.flightPoints && Array.isArray(flight.status.flightPoints) && flight.status.flightPoints.length >= 2) {
+      departureAirport = flight.status.flightPoints[0].iataCode || 'N/A';
+      arrivalAirport = flight.status.flightPoints[1].iataCode || 'N/A';
     }
+
+    return { departureAirport, arrivalAirport };
+  };
+
+  // Function to determine the overall journey details
+  const getJourneyDetails = () => {
+    if (!flights || flights.length === 0 || !flights[0].status) {
+      return { origin: 'N/A', destination: 'N/A', startDate: null, endDate: null };
+    }
+
+    // Get the first flight's origin and the last flight's destination
+    const firstFlight = flights[0];
+    const lastFlight = flights[flights.length - 1];
+    
+    const { departureAirport: origin } = getFlightEndpoints(firstFlight);
+    const { arrivalAirport: destination } = getFlightEndpoints(lastFlight);
+    
+    // Get the first flight's departure date and the last flight's arrival date
+    const startDate = firstFlight.status ? new Date(firstFlight.status.departure) : null;
+    const endDate = lastFlight.status ? new Date(lastFlight.status.arrival) : null;
+    
+    return { origin, destination, startDate, endDate };
+  };
+
+  // Get journey details for the title
+  const { origin, destination, startDate, endDate } = getJourneyDetails();
+  
+  // Generate a booking code based on itinerary name or random
+  const generateBookingCode = () => {
+    // If itinerary name exists, format it (remove spaces, uppercase)
+    if (itineraryName) {
+      return itineraryName.replace(/\s+/g, '').toUpperCase().substring(0, 6);
+    }
+    
+    // Otherwise generate random
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 6; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+  };
+  
+  const bookingCode = generateBookingCode();
+
+  // Sort flights by departure time
+  const sortedFlights = [...flights].sort((a, b) => {
+    if (!a.status?.departure || !b.status?.departure) return 0;
+    return new Date(a.status.departure).getTime() - new Date(b.status.departure).getTime();
   });
 
-  // Sort groups by date, then sort flights within each group by departure time
-  flightGroups.sort((a, b) => a.date.getTime() - b.date.getTime());
-  flightGroups.forEach(group => {
-    group.flights.sort((a, b) => a.departureDate.getTime() - b.departureDate.getTime());
-  });
+  // Calculate travel dates from first and last flight
+  const getTravelDates = () => {
+    if (flights.length === 0 || !flights.some(f => f.status)) {
+      return { startDate: null, endDate: null };
+    }
+    
+    const validFlights = flights.filter(f => f.status && f.status.departure);
+    if (!validFlights.length) return { startDate: null, endDate: null };
+    
+    validFlights.sort((a, b) => {
+      // At this point we know these have status objects because of our filter
+      return new Date(a.status!.departure).getTime() - new Date(b.status!.departure).getTime();
+    });
+    
+    const firstFlight = validFlights[0];
+    const lastFlight = validFlights[validFlights.length - 1];
+    
+    // These are safe because we filtered for flights with status and departure/arrival
+    const startDate = new Date(firstFlight.status!.departure);
+    const endDate = new Date(lastFlight.status!.arrival);
+    
+    return { startDate, endDate };
+  };
+  
+  const { startDate: travelStartDate, endDate: travelEndDate } = getTravelDates();
 
   return (
-    <div className="space-y-5 p-2 font-sans">
-      {/* Header */}
-      <div className="flex justify-between items-center px-1">
-        <div>
-          <h3 className="text-xl font-semibold text-gray-900">{itineraryName || "Flight Itinerary"}</h3>
-          <p className="text-sm text-gray-600">
-            {flights.length} {flights.length === 1 ? "flight" : "flights"}
-          </p>
+    <div className="font-sans w-full">
+      <div className="bg-[#fffaf0] rounded-lg overflow-hidden w-full shadow-[0_0_15px_rgba(0,0,0,0.1),0_5px_10px_rgba(0,0,0,0.05)] border border-gray-100 relative" style={{
+        backgroundImage: `radial-gradient(#00000003 1px, transparent 0)`,
+        backgroundSize: `20px 20px`,
+        backgroundPosition: 'center',
+        backgroundRepeat: 'repeat',
+        backgroundBlendMode: 'normal'
+      }}>
+        {/* Subtle paper edge effect at the top */}
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-b from-gray-200 to-transparent opacity-50"></div>
+        
+        {/* Boarding Pass Header with Booking Code */}
+        <div className="bg-red-600 text-white p-4 flex items-center justify-between rounded-t-lg">
+          <div className="flex items-center">
+            <h2 className="text-xl sm:text-2xl font-bold whitespace-nowrap tracking-wider font-mono">BOARDING PASS</h2>
+            <Plane className="ml-2 sm:ml-3 h-5 sm:h-6 w-5 sm:w-6" />
+          </div>
+          <div className="text-xl sm:text-2xl font-mono font-bold">{bookingCode}</div>
         </div>
-        <div className="h-11 w-11 rounded-full bg-sky-100 flex items-center justify-center">
-          <Plane className="h-5 w-5 text-sky-600" />
+        
+        {/* Flight Name - Move from right side to left */}
+        <div className="px-6 pt-4">
+          <div className="text-lg font-bold">{sortedFlights[0]?.airline} {sortedFlights[0]?.flightNumber}</div>
         </div>
-      </div>
+        
+        {/* Flight List */}
+        <div className="divide-y divide-gray-200">
+          {sortedFlights.map((flight, index) => {
+            if (!flight.status) return null;
 
-      {/* Flight Groups */}
-      <div className="space-y-4">
-        {flightGroups.map((group, groupIndex) => (
-          <div key={group.date.toISOString()} className="px-1">
-            {/* Date Header */}
-            <div className="bg-gray-100 py-1.5 px-3 rounded mb-3 shadow-sm">
-              <p className="text-base font-medium text-gray-800 text-center">{format(group.date, "EEE, MMM d, yyyy")}</p>
-            </div>
+            const { departureAirport, arrivalAirport } = getFlightEndpoints(flight);
+            const departureDate = new Date(flight.status.departure);
+            const arrivalDate = new Date(flight.status.arrival);
+            const isOvernight = !isSameDay(departureDate, arrivalDate);
+            const formattedDuration = formatDuration(flight.status.duration);
             
-            {/* Flights within Group */}
-            <div className="space-y-3">
-              {group.flights.map((flight) => {
-                if (!flight.status) return null;
-
-                const departureTime = formatTime(flight.status.departure);
-                const arrivalTime = formatTime(flight.status.arrival);
-                const departureAirport = flight.status.flightPoints?.[0]?.iataCode || 
-                  flight.status.segments?.[0]?.boardPointIataCode || "N/A";
-                const arrivalAirport = flight.status.flightPoints?.[1]?.iataCode || 
-                  flight.status.segments?.[0]?.offPointIataCode || "N/A";
-                const formattedDuration = formatDuration(flight.status.duration);
+            // Get airport names
+            const departureAirportName = getAirportName(departureAirport);
+            const arrivalAirportName = getAirportName(arrivalAirport);
+            
+            return (
+              <div key={flight.id} className="p-6 hover:bg-[#fffdf7] bg-[#fffaf0]">
+                {/* Remove flight info from here as we've moved it to the top */}
                 
-                // Get airport names
-                const departureAirportName = getAirportName(departureAirport);
-                const arrivalAirportName = getAirportName(arrivalAirport);
-
-                return (
-                  // Individual flight card
-                  <div key={flight.id} className="pl-4 py-2">
-                    {/* Airline Info */}
-                    <div className="mb-2">
-                      <h4 className="font-semibold text-base text-gray-900">
-                        {flight.airline} {flight.flightNumber}
-                      </h4>
-                      <p className="text-sm text-gray-600">{getAirlineName(flight.airline)}</p>
-                    </div>
-
-                    {/* Departure/Arrival Row */}
-                    <div className="flex items-center justify-between space-x-3">
-                      {/* Departure Info */}
-                      <div className="text-center flex-shrink-0 w-[80px]">
-                        <p className="text-xl font-bold text-gray-900">{departureAirport}</p>
-                        <p className="text-sm text-gray-500">{departureTime}</p>
-                        {departureAirportName && (
-                          <p className="text-[10px] text-gray-600 mt-0.5 leading-tight max-h-8 overflow-hidden line-clamp-2">
-                            {truncateAirportName(departureAirportName)}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Flight Path Graphic */}
-                      <div className="flex-1 text-center min-w-0">
-                        <div className="relative flex items-center justify-center h-px my-3">
-                          <div className="border-t border-gray-300 w-full"></div>
-                          <div className="absolute bg-white px-2">
-                            <Plane className="h-4 w-4 text-sky-600 transform -rotate-45" />
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">{formattedDuration}</p>
-                      </div>
-
-                      {/* Arrival Info */}
-                      <div className="text-center flex-shrink-0 w-[80px]">
-                        <p className="text-xl font-bold text-gray-900">{arrivalAirport}</p>
-                        <p className="text-sm text-gray-500">{arrivalTime}</p>
-                        {flight.isOvernight && <p className="text-xs text-sky-600 font-medium">+1 day</p>}
-                        {arrivalAirportName && (
-                          <p className="text-[10px] text-gray-600 mt-0.5 leading-tight max-h-8 overflow-hidden line-clamp-2">
-                            {truncateAirportName(arrivalAirportName)}
-                          </p>
-                        )}
-                      </div>
+                {/* Flight details */}
+                <div className="grid grid-cols-7 gap-2">
+                  {/* Departure */}
+                  <div className="col-span-3 flex flex-col">
+                    <div className="text-3xl font-bold mb-1">{departureAirport}</div>
+                    <div className="text-xs text-gray-500 line-clamp-2 break-words min-h-[2.5rem]">{truncateAirportName(departureAirportName)}</div>
+                    <div className="text-xl font-bold mt-auto">{formatTime(flight.status.departure)}</div>
+                    <div className="text-sm">{format(departureDate, "EEE, MMM d")}</div>
+                  </div>
+                  
+                  {/* Middle section with duration */}
+                  <div className="col-span-1 flex flex-col items-center justify-center text-center">
+                    <div className="text-sm font-medium text-gray-500 text-center w-full">{formattedDuration}</div>
+                    <div className="h-0.5 w-full bg-gray-300 my-2"></div>
+                    <div className="relative w-full flex justify-center">
+                      <Plane className="h-4 w-4 text-gray-500 transform -rotate-45" />
+                      {isOvernight && <span className="text-xs text-blue-600 absolute -right-1 -top-1">+1</span>}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-            
-            {/* Divider between date groups */}            
-            {groupIndex < flightGroups.length - 1 && (
-              <div className="border-t border-dashed border-gray-200 my-4 mx-1"></div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Footer */}
-      <div className="text-center pt-2 pb-1 px-2 mt-4">
-        <p className="text-xs text-gray-500">Generated with Flight Share • {new Date().toLocaleDateString()}</p>
+                  
+                  {/* Arrival */}
+                  <div className="col-span-3 flex flex-col items-end">
+                    <div className="text-3xl font-bold mb-1">{arrivalAirport}</div>
+                    <div className="text-xs text-gray-500 line-clamp-2 break-words text-right min-h-[2.5rem]">{truncateAirportName(arrivalAirportName)}</div>
+                    <div className="text-xl font-bold mt-auto">{formatTime(flight.status.arrival)}</div>
+                    <div className="text-sm">{format(arrivalDate, "EEE, MMM d")}</div>
+                  </div>
+                </div>
+                
+                {/* Additional details */}
+                <div className="mt-4 flex justify-between text-sm">
+                  {flight.status.departureTerminal && (
+                    <div>
+                      <span className="text-gray-500">Terminal:</span> {flight.status.departureTerminal}
+                    </div>
+                  )}
+                  {flight.status.departureGate && (
+                    <div>
+                      <span className="text-gray-500">Gate:</span> {flight.status.departureGate}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        
+        {/* Footer */}
+        <div className="bg-[#f8f5ed] p-4 text-center border-t border-gray-200">
+          <p className="text-xs text-gray-500">Generated with Flight Share • {new Date().toLocaleDateString()}</p>
+        </div>
+        
+        {/* Subtle paper edge effect at the bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-t from-gray-200 to-transparent opacity-50"></div>
       </div>
     </div>
   );
